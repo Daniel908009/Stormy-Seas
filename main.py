@@ -7,7 +7,7 @@ from pygame import mixer
 # functions
 # function for spawning obstacles, powerups, etc.
 def spawn_thread():
-    global running, spawnning, obstacle_sprites, powerup_sprites, settings, player, game_over
+    global running, spawnning, obstacle_sprites, powerup_sprites, settings, player, game_over, chance_of_powerup, powerups_not_allowed
     clock = pygame.time.Clock()
     waiting_time = 0
     while running:
@@ -15,14 +15,14 @@ def spawn_thread():
         while spawnning and settings == False and game_over == False:
             obs = obstacle(random.choice(obstacle_imges))
             obstacle_sprites.add(obs)
-            if player.can_fire == False :
+            if player.can_fire == False and player.no_fire_limit == False:
                 waiting_time += 1
                 if waiting_time == player.firing_rate:
                     player.can_fire = True
                     waiting_time = 0
                     print("Can fire")
             # every once in a while a powerup will spawn
-            if random.randint(0, 100) < 5:
+            if random.randint(0, 100) < chance_of_powerup and powerups_not_allowed == False:
                 pw = Powerup()
                 powerup_sprites.add(pw)
             # adding a point every second
@@ -40,40 +40,66 @@ def restart_game():
 
 # function for game over screen
 def game_over_screen():
-    global running, spawnning, game_over
+    global running, spawnning, game_over, width, height
     spawnning = False
     game_over = True
+    can_exit = 0
     while game_over:
         screen.fill((255, 255, 255))
         text = font.render("Game Over", True, (0, 0, 0))
-        screen.blit(text, (800/2-text.get_width()/2, 600/2-text.get_height()/2))
+        screen.blit(text, (width/2-text.get_width()/2, height/2-text.get_height()/2))
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 game_over = False
                 running = False
+            # checking for restart or exit and also ensuring that the player cant misclick
             if event.type == pygame.KEYDOWN:
                 if event.key == pygame.K_r:
                     spawnning = True
                     game_over = False
                     restart_game()
-                else:
+                elif can_exit >= 600:
                     running = False
                     game_over = False
+            
+        if can_exit < 600:
+            can_exit += 1
+        clock.tick(60)
         pygame.display.update()
 
 # function for applying settings
-def apply(window, health, speed, upgrade, invincible):
-    global settings, setting_health, setting_speed, setting_upgrade
+def apply(window, health, speed, upgrade, invincible, powerup, enemy, reload, enemies, sound, music, powerups, mode):
+    global settings, setting_health, setting_speed, setting_upgrade, no_fire_limit, sounds_allowed, music_allowed, powerups_not_allowed, game_mode, chance_of_powerup
     if health != "":
         setting_health = int(health)
     if speed != "":
         setting_speed = int(speed)
     if upgrade != "":
         setting_upgrade = int(upgrade)
-    if invincible == True:
+    if invincible:
         player.invincible = True
     else:
         player.invincible = False
+    if powerup != "":
+        chance_of_powerup = int(powerup)
+    if reload:
+        no_fire_limit = True
+    else:
+        no_fire_limit = False
+    if sound:
+        sounds_allowed = True
+    else:
+        sounds_allowed = False
+    if music:
+        music_allowed = True
+    else:
+        music_allowed = False
+    if powerups:
+        powerups_not_allowed = True
+    else:
+        powerups_not_allowed = False
+    if mode != "":
+        game_mode = mode
     settings = False
     window.destroy()
     restart_game()
@@ -81,9 +107,10 @@ def apply(window, health, speed, upgrade, invincible):
 # function for settings window
 # currently for some reason when called it doesnt respond, will fix later though
 def settings_window():
+    global setting_health, setting_speed, setting_upgrade, player, chance_of_powerup, no_fire_limit, sounds_allowed, music_allowed, powerups_not_allowed, game_mode
     window = tk.Tk()
     window.title("Settings")
-    window.geometry("300x300")
+    window.geometry("500x500")
     window.resizable(False, False)
     #window.iconbitmap("")
     label = tk.Label(window, text="Settings")
@@ -93,31 +120,91 @@ def settings_window():
     # health number setting
     health_label = tk.Label(frame, text="Health:")
     health_label.grid(row=0, column=0)
-    health_entry = tk.Entry(frame, textvariable= str(setting_health))   
+    e1 = tk.StringVar()
+    e1.set(setting_health)
+    health_entry = tk.Entry(frame, textvariable= e1)   
     health_entry.grid(row=0, column=1)
     # speed setting
     speed_label = tk.Label(frame, text="Speed:")
     speed_label.grid(row=1, column=0)
-    speed_entry = tk.Entry(frame, textvariable=setting_speed)
+    e2 = tk.StringVar()
+    e2.set(setting_speed)
+    speed_entry = tk.Entry(frame, textvariable=e2)
     speed_entry.grid(row=1, column=1)
     # boat setting
     upgrade_label = tk.Label(frame, text="Boat level:")
     upgrade_label.grid(row=2, column=0)
-    upgrade_entry = tk.Entry(frame, textvariable=setting_upgrade)
+    e3 = tk.StringVar()
+    e3.set(setting_upgrade)
+    upgrade_entry = tk.Entry(frame, textvariable=e3)
     upgrade_entry.grid(row=2, column=1)
     # invincibility setting
     invincible_label = tk.Label(frame, text="Invincibility: ")
     invincible_label.grid(row=3, column=0)
-    e1 = tk.BooleanVar()
-    if player.invincible == True:
-        e1.set(True)
+    e9 = tk.BooleanVar()
+    if player.invincible:
+        e9.set(True)
     else:
-        e1.set(False)
-    invincible_check = tk.Checkbutton(frame, variable=e1)
+        e9.set(False)
+    invincible_check = tk.Checkbutton(frame, variable=e9)
     invincible_check.grid(row=3, column=1)
+    # chance of powerup setting
+    powerup_label = tk.Label(frame, text="Powerup chance:")
+    powerup_label.grid(row=4, column=0)
+    e4 = tk.StringVar()
+    e4.set(str(chance_of_powerup))
+    powerup_entry = tk.Entry(frame, textvariable=e4)
+    powerup_entry.grid(row=4, column=1)
+    # chance of enemy setting
+    enemy_label = tk.Label(frame, text="Enemy chance:")
+    enemy_label.grid(row=5, column=0)
+    # will need to be done later when I actually add enemies
+    enemy_entry = tk.Entry(frame)
+    enemy_entry.grid(row=5, column=1)
+    # no firing reload setting
+    reload_label = tk.Label(frame, text="No reload time:")
+    reload_label.grid(row=6, column=0)
+    e5 = tk.BooleanVar()
+    e5.set(no_fire_limit)
+    reload_entry = tk.Checkbutton(frame, variable=e5)
+    reload_entry.grid(row=6, column=1)
+    # no of enemies setting
+    enemies_label = tk.Label(frame, text="No enemies:")
+    enemies_label.grid(row=7, column=0)
+    # also needs to be done later
+    enemies_entry = tk.Checkbutton(frame)
+    enemies_entry.grid(row=7, column=1)
+    # no sound setting
+    sound_label = tk.Label(frame, text="Sound:")
+    sound_label.grid(row=8, column=0)
+    e6 = tk.BooleanVar()
+    e6.set(sounds_allowed)
+    sound_check = tk.Checkbutton(frame, variable=e6)
+    sound_check.grid(row=8, column=1)
+    # no music setting
+    music_label = tk.Label(frame, text="Music:")
+    music_label.grid(row=9, column=0)
+    e7 = tk.BooleanVar()
+    e7.set(music_allowed)
+    music_check = tk.Checkbutton(frame, variable=e7)
+    music_check.grid(row=9, column=1)
+    # no of powerups setting
+    powerups_label = tk.Label(frame, text="No powerups:")
+    powerups_label.grid(row=10, column=0)
+    e10 = tk.BooleanVar()
+    e10.set(powerups_not_allowed)
+    powerups_check = tk.Checkbutton(frame, variable=e10)
+    powerups_check.grid(row=10, column=1)
+    # game mode setting
+    mode_label = tk.Label(frame, text="Game mode:")
+    mode_label.grid(row=11, column=0)
+    e8 = tk.StringVar()
+    e8.set(game_mode)
+    mode_option = tk.OptionMenu(frame, e8, "Endless", "Timed")
+    mode_option.grid(row=11, column=1)
 
     # apply button
-    button = tk.Button(window, text="Apply", command=lambda: apply(window, health_entry.get(), speed_entry.get(), upgrade_entry.get(), e1.get()))
+    button = tk.Button(window, text="Apply", command=lambda: apply(window, e1.get(), e2.get(), e3.get(), e4.get(), e5.get(), e6.get(), e7.get(), e8.get(), e9.get(), e10.get()))
     button.pack(side=tk.BOTTOM)
 
     window.mainloop()
@@ -144,7 +231,8 @@ class Player(pygame.sprite.Sprite):
 
     def shoot(self):
         global canonballs
-        ship_fire.play()
+        if sounds_allowed:
+            ship_fire.play()
         self.can_fire = False
         bullet = Bullet(self.rect.x, self.rect.y)
         canonballs.add(bullet)
@@ -236,6 +324,7 @@ playerImg = pygame.transform.scale(pygame.image.load("boat.png"), (base_size, ba
 setting_speed = 2
 setting_health = 3
 setting_upgrade = 1
+no_fire_limit = False
 player = Player()
 
 # canonballs
@@ -266,25 +355,47 @@ running = True
 spawnning = True
 settings = False
 screen_speed = 1
+sounds_allowed = True
+music_allowed = True
+chance_of_powerup = 5
 font = pygame.font.Font(None, int(base_size/2))
 entering_menu = True
 game_over = False
+powerups_not_allowed = False
+game_mode = "Endless"
 while running:
 
     # entering menu
     while entering_menu:
         screen.fill((255, 255, 255))
-        text = font.render("Press any key to start", True, (0, 0, 0))
-        screen.blit(text, (width/2-text.get_width()/2, height/2-text.get_height()/2))
-        pygame.display.update()
+        # creating three buttons for the main menu
+        button1 = pygame.Rect(width/2 - base_size*2, height/2 - base_size/2, base_size*4, base_size)
+        button2 = pygame.Rect(width/2 - base_size*2, height/2 + base_size/2, base_size*4, base_size)
+        button3 = pygame.Rect(width/2 - base_size*2, height/2 + base_size*1.5, base_size*4, base_size)
+        pygame.draw.rect(screen, (0, 0, 0), button1)
+        pygame.draw.rect(screen, (0, 0, 0), button2)
+        pygame.draw.rect(screen, (0, 0, 0), button3)
+        text = font.render("Start", True, (255, 255, 255))
+        screen.blit(text, (width/2-text.get_width()/2, height/2 - base_size/2 + base_size/4))
+        text = font.render("High scores", True, (255, 255, 255))
+        screen.blit(text, (width/2-text.get_width()/2, height/2 + base_size/2 + base_size/4))
+        text = font.render("Exit", True, (255, 255, 255))
+        screen.blit(text, (width/2-text.get_width()/2, height/2 + base_size*1.5 + base_size/4))
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 running = False
                 entering_menu = False
-            if event.type == pygame.KEYDOWN:
-                entering_menu = False
             if event.type == pygame.MOUSEBUTTONDOWN:
-                entering_menu = False
+                x, y = pygame.mouse.get_pos()
+                if button1.collidepoint(x, y):
+                    entering_menu = False
+                elif button2.collidepoint(x, y):
+                    pass
+                elif button3.collidepoint(x, y):
+                    running = False
+                    entering_menu = False
+                    spawnning = False
+        pygame.display.update()
 
     # starting the spawning thread
     if not spawn_thread.is_alive():
@@ -328,7 +439,7 @@ while running:
     if player.rect.x < 0:
         player.rect.x = 0
     elif player.rect.x > width - playerImg.get_width():
-        player.rect.x = width - playerImg.get_width()
+        player.rect.x = width - playerImg.get_width() 
     if player.rect.y < 0:
         player.rect.y = 0
     elif player.rect.y > height - playerImg.get_height():
@@ -373,16 +484,18 @@ while running:
                 else:
                     player.health -= 1
                 if player.health == 0:
-                    ship_destroyed.play()
+                    if sounds_allowed:
+                        ship_destroyed.play()
                     game_over_screen()
-                else:
+                elif sounds_allowed:
                     ship_hit.play()
     
     # checking for collision between player and powerups
     for powerup in powerup_sprites:
         if player.rect.colliderect(powerup.rect):
             powerup_sprites.remove(powerup)
-            powerup_pickup.play()
+            if sounds_allowed:
+                powerup_pickup.play()
             if powerup.type == "speed":
                 screen_speed += 0.2
             elif powerup.type == "health":
