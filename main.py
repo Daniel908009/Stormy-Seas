@@ -7,7 +7,7 @@ from pygame import mixer
 # functions
 # function for spawning obstacles, powerups, etc.
 def spawn_thread():
-    global running, spawnning, obstacle_sprites, powerup_sprites, settings, player, game_over, chance_of_powerup, powerups_not_allowed
+    global running, spawnning, obstacle_sprites, powerup_sprites, settings, player, game_over, chance_of_powerup, powerups_not_allowed,no_fire_limit
     clock = pygame.time.Clock()
     waiting_time = 0
     while running:
@@ -15,7 +15,7 @@ def spawn_thread():
         while spawnning and settings == False and game_over == False:
             obs = obstacle(random.choice(obstacle_imges))
             obstacle_sprites.add(obs)
-            if player.can_fire == False and player.no_fire_limit == False:
+            if player.can_fire == False and no_fire_limit == False:
                 waiting_time += 1
                 if waiting_time == player.firing_rate:
                     player.can_fire = True
@@ -25,6 +25,12 @@ def spawn_thread():
             if random.randint(0, 100) < chance_of_powerup and powerups_not_allowed == False:
                 pw = Powerup()
                 powerup_sprites.add(pw)
+            # changing the day night cycle
+            if player.points % 100 == 0:
+                if day_night_cycle == "day":
+                    day_night_cycle = "night"
+                else:
+                    day_night_cycle = "day"
             # adding a point every second
             player.points += 1
             clock.tick(1)
@@ -37,13 +43,66 @@ def restart_game():
     obstacle_sprites = pygame.sprite.Group()
     powerup_sprites = pygame.sprite.Group()
 
+# function for saving the score to a separate file
+def save_score():
+    global player
+    # saving the score with a player name to a separate file, this is used for the high scores leaderboard screen
+    try:
+        with open("scores.txt", "r") as file:
+            scores = file.readlines()
+            scores.append("Player, "+str(player.points)+"\n")
+            scores = sorted(scores, key=lambda x: int(x.split(", ")[1]), reverse=True)
+        with open("scores.txt", "w") as file:
+            for score in scores:
+                file.write(score)
+    # if there is no file for the scores, creating one and writing the score to it
+    except:
+        with open("scores.txt", "w") as file:
+            file.write("Player, "+str(player.points)+"\n")
+        
+    # closing the file
+    file.close()
+# function for high scores screen
+def high_scores_screen():
+    global width, height, screen, running, spawnning, entering_menu
+    # reading the scores from the file if it exists and displaying the first 10
+    try:
+        with open("scores.txt", "r") as file:
+            scores = file.readlines()
+            scores = scores[:10]
+    except:
+        scores = []
+    # creating the actual window
+    screen.fill((255, 255, 255))
+    font = pygame.font.Font(None, int(base_size))
+    score_screen_running = True
+    while score_screen_running:
+        for i, score in enumerate(scores):
+            score = score.strip()
+            text = font.render(str(i+1)+". "+score, True, (0, 0, 0))
+            screen.blit(text, (width/2-text.get_width()/2, height/2-text.get_height()/2 + i*text.get_height()))
+        
+        # displaying the back arrow
+        screen.blit(back_arrow, (0, 0))
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                score_screen_running = False
+                running = False
+                entering_menu = False
+                spawnning = False
+            if event.type == pygame.MOUSEBUTTONDOWN:
+                x, y = pygame.mouse.get_pos()
+                if x < back_arrow.get_width() and y < back_arrow.get_height():
+                    score_screen_running = False
+        pygame.display.update()
 
 # function for game over screen
 def game_over_screen():
-    global running, spawnning, game_over, width, height
+    global running, spawnning, game_over, width, height, game_played
     spawnning = False
     game_over = True
     can_exit = 0
+    game_played = False
     while game_over:
         screen.fill((255, 255, 255))
         text = font.render("Game Over", True, (0, 0, 0))
@@ -297,6 +356,45 @@ class Bullet(pygame.sprite.Sprite):
         self.rect.y = y - self.image.get_height()
     def move(self):
         self.rect.y -= 5
+                                        # all of the enemy classes will be completed later, this is just a basic structure
+# class for enemies(enemy boats)
+class Enemy(pygame.sprite.Sprite):
+    def __init__(self):
+        super().__init__()
+        self.image = pygame.transform.scale(pygame.image.load("boat.png"), (base_size, base_size)) # Special images will be added later
+        self.rect = self.image.get_rect()
+        self.rect.x = random.randint(0, 800)
+        self.rect.y = 0 - self.image.get_height()
+    def move(self, change):
+        self.rect.y += change
+    def shoot(self):
+        global enemy_canonballs
+        ball = EnemyBullet(self.rect.x, self.rect.y)
+        enemy_canonballs.add(ball)
+
+# class for enemy bullets
+class EnemyBullet(pygame.sprite.Sprite):
+    def __init__(self, x, y):
+        super().__init__()
+        self.image = pygame.transform.scale(pygame.image.load("powerup_upg.png"), (base_size/4, base_size/4))
+        self.rect = self.image.get_rect()
+        self.rect.x = x + base_size/2 - self.image.get_width()/2
+        self.rect.y = y - self.image.get_height()
+    def move(self):
+        self.rect.y += 5
+
+# class for some boss enemies
+class Boss(Enemy):
+    def __init__(self):
+        super().__init__()
+        self.image = pygame.transform.scale(pygame.image.load("boat.png"), (base_size, base_size)) # Special images will be added later
+        self.rect = self.image.get_rect()
+        self.rect.x = random.randint(0, 800)
+        self.rect.y = 0 - self.image.get_height()
+    def shoot(self):
+        pass
+    def move(self, change):
+        self.rect.y += change
 
 # Initializing the game
 pygame.init()
@@ -311,6 +409,9 @@ icon = pygame.image.load("boat.png")
 pygame.display.set_icon(icon)
 clock = pygame.time.Clock()
 setting_img = pygame.transform.scale(pygame.image.load("settings.png"), (base_size, base_size))
+back_arrow = pygame.transform.scale(pygame.image.load("back_arrow.png"), (base_size, base_size))
+sun = pygame.transform.scale(pygame.image.load("sun.png"), (base_size, base_size))
+moon = pygame.transform.scale(pygame.image.load("moon.png"), (base_size, base_size))
 
 # sounds and music
 ship_hit = mixer.Sound("ship_hit.mp3")
@@ -330,15 +431,21 @@ player = Player()
 # canonballs
 canonballs = pygame.sprite.Group()
 
+# enemies
+enemies = pygame.sprite.Group()
+enemy_canonballs = pygame.sprite.Group()
+
 # Obstacle
 obstacleImg = pygame.transform.scale(pygame.image.load("stone.png"), (base_size, base_size))
 obstacleImg2 = pygame.transform.scale(pygame.image.load("glacier.png"), (base_size, base_size))
 obstacleImg3 = pygame.transform.scale(pygame.image.load("stone2.png"), (base_size, base_size))
-obstacle_imges = [obstacleImg, obstacleImg2, obstacleImg3]
+obstacleImg4 = pygame.transform.scale(pygame.image.load("stone3.png"), (base_size, base_size))
+obstacleImg5 = pygame.transform.scale(pygame.image.load("glacier2.png"), (base_size, base_size))
+obstacle_imges = [obstacleImg, obstacleImg2, obstacleImg3, obstacleImg4, obstacleImg5]
 obstacle_sprites = pygame.sprite.Group()
 
 # Powerup
-# I will add distinct powerup images later on
+# More powerup images will be added later
 powerupImg_speed = pygame.transform.scale(pygame.image.load("boat.png"), (base_size, base_size))
 powerupImg_health = pygame.transform.scale(pygame.image.load("powerup_health.png"), (base_size, base_size))
 powerupImg_shield = pygame.transform.scale(pygame.image.load("powerup.png"), (base_size, base_size))
@@ -363,6 +470,8 @@ entering_menu = True
 game_over = False
 powerups_not_allowed = False
 game_mode = "Endless"
+game_played = False
+day_night_cycle = "day" # will be used later for changing the colors of the entire game (white and black for night)
 while running:
 
     # entering menu
@@ -375,6 +484,13 @@ while running:
         pygame.draw.rect(screen, (0, 0, 0), button1)
         pygame.draw.rect(screen, (0, 0, 0), button2)
         pygame.draw.rect(screen, (0, 0, 0), button3)
+        # displaying a resume button if the game has started but not ended
+        if game_played:
+            button4 = pygame.Rect(width/2 - base_size*2, height/2 - base_size*2, base_size*4, base_size)
+            pygame.draw.rect(screen, (0, 0, 0), button4)
+            text = font.render("Resume", True, (255, 255, 255))
+            screen.blit(text, (width/2-text.get_width()/2, height/2 - base_size*2 + base_size/4))
+            
         text = font.render("Start", True, (255, 255, 255))
         screen.blit(text, (width/2-text.get_width()/2, height/2 - base_size/2 + base_size/4))
         text = font.render("High scores", True, (255, 255, 255))
@@ -389,19 +505,27 @@ while running:
                 x, y = pygame.mouse.get_pos()
                 if button1.collidepoint(x, y):
                     entering_menu = False
+                    spawnning = True
+                    game_played = True
+                    restart_game()
                 elif button2.collidepoint(x, y):
-                    pass
+                    high_scores_screen()
                 elif button3.collidepoint(x, y):
                     running = False
                     entering_menu = False
                     spawnning = False
+                elif game_played and button4.collidepoint(x, y):
+                    entering_menu = False
+                    spawnning = True
         pygame.display.update()
 
     # starting the spawning thread
     if not spawn_thread.is_alive():
         spawn_thread.start()
+
     # making background blue
     screen.fill((0, 0, 255))
+
     # checking for events
     for event in pygame.event.get():
         if event.type == pygame.QUIT:
@@ -425,12 +549,16 @@ while running:
             if event.key == pygame.K_UP or event.key == pygame.K_DOWN or event.key == pygame.K_w or event.key == pygame.K_s:
                 player.y_change = 0
         if event.type == pygame.MOUSEBUTTONDOWN:
-            # checking if the settings button is clicked
             if event.button == 1:
+                # checking if the settings button is clicked
                 x, y = pygame.mouse.get_pos()
                 if x > width - setting_img.get_width() and y < setting_img.get_height():
                     settings = True
                     settings_window()
+                # checking if the back arrow is clicked
+                elif x < back_arrow.get_width() and y < back_arrow.get_height():
+                    entering_menu = True
+                    spawnning = False
 
     # moving player
     player.move()
@@ -466,6 +594,15 @@ while running:
     # drawing settings button
     screen.blit(setting_img, (width - setting_img.get_width(), 0))
 
+    # drawing back arrow
+    screen.blit(back_arrow, (0, 0))
+
+    # drawing sun or moon based on the day night cycle
+    if day_night_cycle == "day":
+        screen.blit(sun, (width - sun.get_width(), setting_img.get_height()*1.5))
+    else:
+        screen.blit(moon, (width - moon.get_width(), setting_img.get_height()*1.5))
+
     # drawing points
     text = font.render(str(player.points)+" m", True, (0, 0, 0))
     screen.blit(text, (width/2-text.get_width()/2, 0))
@@ -486,6 +623,7 @@ while running:
                 if player.health == 0:
                     if sounds_allowed:
                         ship_destroyed.play()
+                    save_score()
                     game_over_screen()
                 elif sounds_allowed:
                     ship_hit.play()
@@ -513,6 +651,30 @@ while running:
             if bullet.rect.colliderect(obs.rect):
                 canonballs.remove(bullet)
                 obstacle_sprites.remove(obs)
+    
+    # checking for collision between enemy bullets and player
+    for bullet in enemy_canonballs:
+        if player.rect.colliderect(bullet.rect):
+            enemy_canonballs.remove(bullet)
+            if player.invincible == False:
+                if player.shield == True:
+                    player.shield = False
+                else:
+                    player.health -= 1
+                if player.health == 0:
+                    if sounds_allowed:
+                        ship_destroyed.play()
+                    save_score()
+                    game_over_screen()
+                elif sounds_allowed:
+                    ship_hit.play()
+    
+    # checking for collision between enemy bullets and powerups(I will add this to later see if this feature makes sense gameplay wise)
+    for bullet in enemy_canonballs:
+        for powerup in powerup_sprites:
+            if bullet.rect.colliderect(powerup.rect):
+                enemy_canonballs.remove(bullet)
+                powerup_sprites.remove(powerup)
 
     clock.tick(60)
     pygame.display.update()
