@@ -8,26 +8,30 @@ import math
 # functions
 # function for spawning obstacles, powerups, etc.
 def spawn_thread():
-    global running, spawnning, obstacle_sprites, powerup_sprites, settings, player, game_over, chance_of_powerup, powerups_not_allowed,no_fire_limit, day_night_cycle
+    global running, spawnning, obstacle_sprites, powerup_sprites, settings, player, game_over, chance_of_powerup, powerups_not_allowed,no_fire_limit, day_night_cycle, chance_of_enemy, enemies_not_allowed
     clock = pygame.time.Clock()
-    waiting_time = 0
+    global waiting_time, reloading_time
     while running:
-        #print("Spawning")
         while spawnning and settings == False and game_over == False:
             obs = obstacle(random.choice(obstacle_imges))
             obstacle_sprites.add(obs)
             if player.can_fire == False and no_fire_limit == False:
-                waiting_time += 1
-                if waiting_time == player.firing_rate:
+                waiting_time -= 1
+                reloading_time += 1
+                if waiting_time == 0:
                     player.can_fire = True
-                    waiting_time = 0
-                    print("Can fire")
+                    waiting_time = player.firing_rate
+                    reloading_time = 0
             # every once in a while a powerup will spawn
             if random.randint(0, 100) < chance_of_powerup and powerups_not_allowed == False:
                 pw = Powerup()
                 powerup_sprites.add(pw)
+            # every once in a while an enemy will spawn
+            if player.points > 20 and random.randint(0, 100) < chance_of_enemy and enemies_not_allowed == False:
+                enemy = Enemy()
+                enemies.add(enemy)
             # changing the day night cycle
-            if player.points % 100 == 0:
+            if player.points % 100 == 0 and player.points != 0:
                 if day_night_cycle == "day":
                     day_night_cycle = "night"
                 else:
@@ -39,10 +43,13 @@ def spawn_thread():
 
 # function for restarting the game
 def restart_game():
-    global player, obstacle_sprites, powerup_sprites
+    global player, obstacle_sprites, powerup_sprites, day_night_cycle, enemy_canonballs, canonballs
+    day_night_cycle = "day"
     player = Player()
     obstacle_sprites = pygame.sprite.Group()
     powerup_sprites = pygame.sprite.Group()
+    enemy_canonballs = pygame.sprite.Group()
+    canonballs = pygame.sprite.Group()
 
 # function for saving the score to a separate file
 def save_score():
@@ -81,7 +88,7 @@ def high_scores_screen():
         for i, score in enumerate(scores):
             score = score.strip()
             text = font.render(str(i+1)+". "+score, True, (0, 0, 0))
-            screen.blit(text, (width/2-text.get_width()/2, height/2-text.get_height()/2 + i*text.get_height()))
+            screen.blit(text, (width/2-text.get_width()/2, height/4-text.get_height()/2 + i*text.get_height()))
         
         # displaying the back arrow
         screen.blit(back_arrow, (0, 0))
@@ -107,7 +114,11 @@ def game_over_screen():
     while game_over:
         screen.fill((255, 255, 255))
         text = font.render("Game Over", True, (0, 0, 0))
-        screen.blit(text, (width/2-text.get_width()/2, height/2-text.get_height()/2))
+        screen.blit(text, (width/2-text.get_width()/2, height/2-text.get_height()))
+        text = font.render("Number of points "+str(player.points), True, (0, 0, 0))
+        screen.blit(text, (width/2-text.get_width()/2, height/2+text.get_height()*0.5))
+        text = font.render("Press R to restart", True, (0, 0, 0))
+        screen.blit(text, (width/2-text.get_width()/2, height/2+text.get_height()*2))
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 game_over = False
@@ -129,19 +140,31 @@ def game_over_screen():
 
 # function for applying settings
 def apply(window, health, speed, upgrade, invincible, powerup, enemy, reload, enemies, sound, music, powerups, mode):
-    global settings, setting_health, setting_speed, setting_upgrade, no_fire_limit, sounds_allowed, music_allowed, powerups_not_allowed, game_mode, chance_of_powerup
+    global settings, setting_health, setting_speed, setting_upgrade, no_fire_limit, sounds_allowed, music_allowed, powerups_not_allowed, game_mode, chance_of_powerup, enemies_not_allowed, chance_of_enemy
     if health != "":
-        setting_health = int(health)
+        try:
+            setting_health = int(health)
+        except:
+            pass
     if speed != "":
-        setting_speed = int(speed)
+        try:
+            setting_speed = int(speed)
+        except:
+            pass
     if upgrade != "":
-        setting_upgrade = int(upgrade)
+        try:
+            setting_upgrade = int(upgrade)
+        except:
+            pass
     if invincible:
         player.invincible = True
     else:
         player.invincible = False
     if powerup != "":
-        chance_of_powerup = int(powerup)
+        try:
+            chance_of_powerup = int(powerup)
+        except:
+            pass
     if reload:
         no_fire_limit = True
     else:
@@ -160,6 +183,15 @@ def apply(window, health, speed, upgrade, invincible, powerup, enemy, reload, en
         powerups_not_allowed = False
     if mode != "":
         game_mode = mode
+    if enemies:
+        enemies_not_allowed = True
+    else:
+        enemies_not_allowed = False
+    if enemy != "":
+        try:
+            chance_of_enemy = int(enemy)
+        except:
+            pass
     settings = False
     window.destroy()
     restart_game()
@@ -218,8 +250,9 @@ def settings_window():
     # chance of enemy setting
     enemy_label = tk.Label(frame, text="Enemy chance:")
     enemy_label.grid(row=5, column=0)
-    # will need to be done later when I actually add enemies
-    enemy_entry = tk.Entry(frame)
+    e11 = tk.StringVar()
+    e11.set(str(chance_of_enemy))
+    enemy_entry = tk.Entry(frame, textvariable=e11)
     enemy_entry.grid(row=5, column=1)
     # no firing reload setting
     reload_label = tk.Label(frame, text="No reload time:")
@@ -231,8 +264,9 @@ def settings_window():
     # no of enemies setting
     enemies_label = tk.Label(frame, text="No enemies:")
     enemies_label.grid(row=7, column=0)
-    # also needs to be done later
-    enemies_entry = tk.Checkbutton(frame)
+    e12 = tk.BooleanVar()
+    e12.set(enemies_not_allowed)
+    enemies_entry = tk.Checkbutton(frame, variable=e12)
     enemies_entry.grid(row=7, column=1)
     # no sound setting
     sound_label = tk.Label(frame, text="Sound:")
@@ -264,7 +298,7 @@ def settings_window():
     mode_option.grid(row=11, column=1)
 
     # apply button
-    button = tk.Button(window, text="Apply", command=lambda: apply(window, e1.get(), e2.get(), e3.get(), e4.get(), e5.get(), e6.get(), e7.get(), e8.get(), e9.get(), e10.get()))
+    button = tk.Button(window, text="Apply", command=lambda: apply(window, e1.get(), e2.get(), e3.get(), e9.get(), e4.get(), e11.get(), e5.get(), e12.get(), e6.get(), e7.get(), e10.get(), e8.get()))# it is a bit confusing naming, but it works
     button.pack(side=tk.BOTTOM)
 
     window.mainloop()
@@ -284,7 +318,7 @@ class Player(pygame.sprite.Sprite):
         self.points = 0
         self.upgrade_level = setting_upgrade
         self.can_fire = True
-        self.firing_rate = 10
+        self.firing_rate = 7
         self.invincible = False
         self.angle = 0
         self.direction = ""
@@ -299,7 +333,6 @@ class Player(pygame.sprite.Sprite):
 
     def move(self):
         # using the angle to move the player
-        #print(self.direction)
         if self.direction == "up":
             self.hori -= math.sin(math.radians(self.angle)) * self.speed
             self.vert -= math.cos(math.radians(self.angle)) * self.speed
@@ -309,15 +342,13 @@ class Player(pygame.sprite.Sprite):
         elif self.direction == "":
             self.hori = 0
             self.vert = 0
-        #print(self.hori, self.vert, self.angle)
-        #print(self.rect.x, self.rect.y)
         self.x += self.hori
         self.y += self.vert
 
         self.rect = self.img.get_rect(center = (self.x, self.y))
     
     def upgrade(self):
-        self.image = pygame.transform.scale(pygame.image.load('boat{self.update_level}.png'), (base_size, base_size))
+        self.image = pygame.transform.scale(pygame.image.load('boat'+str(player.upgrade_level)+'.png'), (base_size, base_size))
         self.rect = self.image.get_rect(center = (self.x, self.y))
         # will be enhanced later on
         if self.upgrade_level == 1:
@@ -326,11 +357,11 @@ class Player(pygame.sprite.Sprite):
             self.firing_rate = 2
         elif self.upgrade_level == 3:
             self.firing_rate = 3
+
     def draw(self):
         self.img = pygame.transform.rotate(playerImg, self.angle)
         screen.blit(self.img, (self.x, self.y))
         self.rect = self.img.get_rect(center = (self.x, self.y))
-        print(self.x, self.y)
 
 # class for obstacles
 class obstacle(pygame.sprite.Sprite):
@@ -381,51 +412,81 @@ class Bullet(pygame.sprite.Sprite):
         self.x += self.hori
         self.y += self.vert
         self.rect = self.image.get_rect(center = (self.x, self.y))
-                                        # all of the enemy classes will be completed later, this is just a basic structure
+
 # class for enemies(enemy boats)
 class Enemy(pygame.sprite.Sprite):
     def __init__(self):
-        super().__init__()
-        self.image = pygame.transform.scale(pygame.image.load("boat.png"), (base_size, base_size)) # Special images will be added later
+        global frame_rate
+        pygame.sprite.Sprite.__init__(self)
+        # the enemy will use the same boat as the player, however the enemy will boats will have a pirate flag on them, this will be added later on
+        if player.upgrade_level == 1:
+            self.image = pygame.transform.scale(pygame.image.load("boat.png"), (base_size, base_size))
+        else:
+            self.image = pygame.transform.scale(pygame.image.load("boat{player.update_level}.png"), (base_size, base_size))
         self.rect = self.image.get_rect()
-        self.rect.x = random.randint(0, 800)
+        self.rect.x = random.randint(0, width - self.image.get_width())
         self.rect.y = 0 - self.image.get_height()
-    def move(self, change):
-        self.rect.y += change
+        self.angle = player.angle + 180 # later will be changed, this is just for testing purposes
+        self.image = pygame.transform.rotate(self.image, self.angle)
+        self.fire_rate = player.firing_rate * frame_rate # this is because the shoot function is called from the main loop 
+        self.can_fire = True
+        self.health = player.health # enemies will have the same health as the player, this could work as a balancing factor
+
+    def move(self):
+        # moving the enemy for now just arround the player
+        if self.rect.x < player.rect.x:
+            self.rect.x += 1
+        elif self.rect.x > player.rect.x:
+            self.rect.x -= 1
+        if self.rect.y < player.rect.y:
+            self.rect.y += 1
+        elif self.rect.y > player.rect.y:
+            self.rect.y -= 1
+    
+    def update(self):
+        # displaying the health of the enemy below the enemy
+        global enemy_font
+        text = enemy_font.render(str(self.health), True, (255, 0, 0))
+        screen.blit(text, (self.rect.x+base_size/2 - text.get_width()/2, self.rect.y + self.image.get_height()))
+
     def shoot(self):
-        global enemy_canonballs
-        ball = EnemyBullet(self.rect.x, self.rect.y)
-        enemy_canonballs.add(ball)
+        global enemy_canonballs, frame_rate, sounds_allowed
+        if self.can_fire == True:
+            if sounds_allowed:
+                ship_fire.play() # maybe later the enemies will have a distinct sound for firing
+            bullet = EnemyBullet(self.rect.x+self.image.get_width()/2, self.rect.y + self.image.get_width()/2, self.angle)
+            enemy_canonballs.add(bullet)
+            self.can_fire = False
+        else:
+            self.fire_rate -= 1
+            if self.fire_rate == 0:
+                self.can_fire = True
+                self.fire_rate = player.firing_rate * frame_rate
 
 # class for enemy bullets
 class EnemyBullet(pygame.sprite.Sprite):
-    def __init__(self, x, y):
-        super().__init__()
-        self.image = pygame.transform.scale(pygame.image.load("powerup_upg.png"), (base_size/4, base_size/4))
-        self.rect = self.image.get_rect()
-        self.rect.x = x + base_size/2 - self.image.get_width()/2
-        self.rect.y = y - self.image.get_height()
+    def __init__(self, x, y, angle):
+        pygame.sprite.Sprite.__init__(self)
+        self.speed = 5
+        self.angle = angle +180
+        self.image = pygame.transform.rotate(pygame.transform.scale(pygame.image.load("powerup_upg.png"), (base_size/4, base_size/4)), self.angle)
+        self.x = x 
+        self.y = y 
+        self.hori = math.sin(math.radians(self.angle)) * self.speed
+        self.vert = math.cos(math.radians(self.angle)) * self.speed
+        self.rect = self.image.get_rect(center = (self.x, self.y))
     def move(self):
-        self.rect.y += 5
-
-# class for some boss enemies
-class Boss(Enemy):
-    def __init__(self):
-        super().__init__()
-        self.image = pygame.transform.scale(pygame.image.load("boat.png"), (base_size, base_size)) # Special images will be added later
-        self.rect = self.image.get_rect()
-        self.rect.x = random.randint(0, 800)
-        self.rect.y = 0 - self.image.get_height()
-    def shoot(self):
-        pass
-    def move(self, change):
-        self.rect.y += change
+        self.x += self.hori
+        self.y += self.vert
+        self.rect = self.image.get_rect(center = (self.x, self.y))
 
 # Initializing the game
 pygame.init()
 width, height = 800, 600
 # base size is a metric for the size of all the basic objects in the game
 base_size = width/12
+# frame rate
+frame_rate = 60
 # allowing resizability
 screen = pygame.display.set_mode((width, height), pygame.RESIZABLE)
 screen = pygame.display.set_mode((width, height))
@@ -452,6 +513,9 @@ setting_health = 3
 setting_upgrade = 1
 no_fire_limit = False
 player = Player()
+waiting_time = player.firing_rate
+reloading_time = 0 # I tried to not have two basicaly same variables, but it needed to be done like this, maybe I will change it later, if I find a better way
+
 
 # canonballs
 canonballs = pygame.sprite.Group()
@@ -459,6 +523,12 @@ canonballs = pygame.sprite.Group()
 # enemies
 enemies = pygame.sprite.Group()
 enemy_canonballs = pygame.sprite.Group()
+chance_of_enemy = 3
+enemies_not_allowed = False
+enemy_font = pygame.font.Font(None, int(base_size/2))
+# spawning a test enemy
+enemy = Enemy()
+enemies.add(enemy)
 
 # Obstacle
 obstacleImg = pygame.transform.scale(pygame.image.load("stone.png"), (base_size, base_size))
@@ -500,6 +570,8 @@ powerups_not_allowed = False
 game_mode = "Endless"
 game_played = False
 angle = 0
+show_powerup_message = False
+keep_message = 5 * frame_rate
 while running:
 
     # entering menu
@@ -606,6 +678,7 @@ while running:
     obstacle_sprites.draw(screen)
     for obs in obstacle_sprites:
         obs.move(screen_speed)
+    obstacle_sprites = pygame.sprite.Group(sorted(obstacle_sprites, key=lambda x: x.rect.y))
 
     # drawing and moving powerups
     powerup_sprites.draw(screen)
@@ -617,9 +690,20 @@ while running:
     for bullet in canonballs:
         bullet.move()
 
+    # drawing and moving enemy bullets
+    enemy_canonballs.draw(screen)
+    for bullet in enemy_canonballs:
+        bullet.move()
+
     # drawing player
     player.draw()
-    #print(player.rect.x, player.rect.y)
+
+    # drawing and moving enemies
+    enemies.draw(screen)
+    for enemy in enemies:
+        enemy.move()
+        enemy.update() # displaying the health of the enemy
+        enemy.shoot()
 
     # drawing settings button
     screen.blit(setting_img, (width - setting_img.get_width(), 0))
@@ -634,12 +718,27 @@ while running:
         screen.blit(moon, (width - moon.get_width(), setting_img.get_height()*1.5))
 
     # drawing points
-    text = font.render(str(player.points)+" m", True, (0, 0, 0))
+    text = font.render(str(player.points)+" points", True, (0, 0, 0))
     screen.blit(text, (width/2-text.get_width()/2, 0))
 
     # drawing health
     text = font.render("Health: "+str(player.health), True, (0, 0, 0))
     screen.blit(text, (width/2 + width/4-text.get_width()/2, 0))
+
+    # drawing the reload time, this may not be the best solution, but I am tired and it works
+    if reloading_time == 0:
+        text = font.render("Reload time: Ready", True, (0, 0, 0))
+    else:
+        text = font.render("Reload time: "+str(player.firing_rate - reloading_time), True, (0, 0, 0))
+    screen.blit(text, (width/2 - width/4-text.get_width()/2, 0))
+
+    # drawing the powerup message
+    if show_powerup_message:
+        screen.blit(powerup_message, (width/2-powerup_message.get_width()/2, height-powerup_message.get_height()*1.5))
+        keep_message -= 1
+        if keep_message == 0:
+            show_powerup_message = False
+            keep_message = 5 * frame_rate
 
     # checking for collision between player and obstacles
     for obs in obstacle_sprites:
@@ -666,14 +765,20 @@ while running:
                 powerup_pickup.play()
             if powerup.type == "speed":
                 screen_speed += 0.2
+                powerup_message = font.render("Speed", True, (0, 0, 0))
             elif powerup.type == "health":
                 player.health += 1
+                powerup_message = font.render("Health", True, (0, 0, 0))
             elif powerup.type == "shield":
                 player.shield = True
+                powerup_message = font.render("Shield", True, (0, 0, 0))
             elif powerup.type == "points":
-                player.points += 10
+                player.points += 30
+                powerup_message = font.render("Points", True, (0, 0, 0))
             elif powerup.type == "upgrade":
+                powerup_message = font.render("Upgrade", True, (0, 0, 0))
                 player.upgrade()
+            show_powerup_message = True
                 
     # checking for collision between bullets and obstacles
     for bullet in canonballs:
@@ -681,6 +786,18 @@ while running:
             if bullet.rect.colliderect(obs.rect):
                 canonballs.remove(bullet)
                 obstacle_sprites.remove(obs)
+
+    # checking for collision between bullets and enemies
+    for bullet in canonballs:
+        for enemy in enemies:
+            if bullet.rect.colliderect(enemy.rect):
+                enemy.health -= 1
+                canonballs.remove(bullet)
+                if enemy.health == 0:
+                    if sounds_allowed:
+                        enemy_destroyed.play()
+                    enemies.remove(enemy)
+                    player.points += 10
     
     # checking for collision between enemy bullets and player
     for bullet in enemy_canonballs:
@@ -706,7 +823,7 @@ while running:
                 enemy_canonballs.remove(bullet)
                 powerup_sprites.remove(powerup)
 
-    clock.tick(60)
+    clock.tick(frame_rate)
     pygame.display.update()
 
 spawnning = False
