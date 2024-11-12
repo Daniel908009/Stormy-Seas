@@ -3,11 +3,12 @@ import random
 import threading
 import tkinter as tk
 from pygame import mixer
+import math
 
 # functions
 # function for spawning obstacles, powerups, etc.
 def spawn_thread():
-    global running, spawnning, obstacle_sprites, powerup_sprites, settings, player, game_over, chance_of_powerup, powerups_not_allowed,no_fire_limit
+    global running, spawnning, obstacle_sprites, powerup_sprites, settings, player, game_over, chance_of_powerup, powerups_not_allowed,no_fire_limit, day_night_cycle
     clock = pygame.time.Clock()
     waiting_time = 0
     while running:
@@ -272,14 +273,12 @@ def settings_window():
 # class for player
 class Player(pygame.sprite.Sprite):
     def __init__(self):
-        super().__init__()
+        pygame.sprite.Sprite.__init__(self)
         self.img = playerImg
-        self.rect = self.img.get_rect()
-        self.rect.x = width/2 - self.img.get_width()/2
-        self.rect.y = height - self.img.get_height()
+        self.x = width/2 - self.img.get_width()/2
+        self.y = height - self.img.get_height()
+        self.rect = self.img.get_rect(center = (self.x, self.y))
         self.speed = setting_speed
-        self.x_change = 0
-        self.y_change = 0
         self.health = setting_health
         self.shield = False
         self.points = 0
@@ -287,22 +286,39 @@ class Player(pygame.sprite.Sprite):
         self.can_fire = True
         self.firing_rate = 10
         self.invincible = False
+        self.angle = 0
+        self.direction = ""
 
     def shoot(self):
         global canonballs
         if sounds_allowed:
             ship_fire.play()
         self.can_fire = False
-        bullet = Bullet(self.rect.x, self.rect.y)
+        bullet = Bullet(self.x+self.img.get_width()/2, self.y + self.img.get_width()/2, self.angle)
         canonballs.add(bullet)
 
     def move(self):
-        self.rect.x += self.x_change
-        self.rect.y += self.y_change
+        # using the angle to move the player
+        #print(self.direction)
+        if self.direction == "up":
+            self.hori -= math.sin(math.radians(self.angle)) * self.speed
+            self.vert -= math.cos(math.radians(self.angle)) * self.speed
+        elif self.direction == "down":
+            self.hori += math.sin(math.radians(self.angle)) * self.speed
+            self.vert += math.cos(math.radians(self.angle)) * self.speed
+        elif self.direction == "":
+            self.hori = 0
+            self.vert = 0
+        #print(self.hori, self.vert, self.angle)
+        #print(self.rect.x, self.rect.y)
+        self.x += self.hori
+        self.y += self.vert
+
+        self.rect = self.img.get_rect(center = (self.x, self.y))
     
     def upgrade(self):
-        self.image = pygame.transform.scale(pygame.image.load('boat{self.update_level}.png'), (64, 64))
-        self.rect = self.image.get_rect()
+        self.image = pygame.transform.scale(pygame.image.load('boat{self.update_level}.png'), (base_size, base_size))
+        self.rect = self.image.get_rect(center = (self.x, self.y))
         # will be enhanced later on
         if self.upgrade_level == 1:
             self.firing_rate = 1
@@ -311,14 +327,17 @@ class Player(pygame.sprite.Sprite):
         elif self.upgrade_level == 3:
             self.firing_rate = 3
     def draw(self):
-        screen.blit(self.img, (self.rect.x, self.rect.y))
+        self.img = pygame.transform.rotate(playerImg, self.angle)
+        screen.blit(self.img, (self.x, self.y))
+        self.rect = self.img.get_rect(center = (self.x, self.y))
+        print(self.x, self.y)
 
 # class for obstacles
 class obstacle(pygame.sprite.Sprite):
     def __init__(self, img):
         super().__init__()
         self.rect = img.get_rect()
-        self.rect.x = random.randint(0, 800)
+        self.rect.x = random.randint(0, width - img.get_width())
         self.rect.y = 0 - obstacleImg.get_height()
         self.image = img
 
@@ -331,7 +350,7 @@ class Powerup(pygame.sprite.Sprite):
         super().__init__()
         self.image = random.choice(powerupsImgs)
         self.rect = self.image.get_rect()
-        self.rect.x = random.randint(0, 800)
+        self.rect.x = random.randint(0, width - self.image.get_width())
         self.rect.y = 0 - self.image.get_height()
         if self.image == powerupImg_speed:
             self.type = "speed"
@@ -348,14 +367,20 @@ class Powerup(pygame.sprite.Sprite):
 
 # class for bullets/cannonballs
 class Bullet(pygame.sprite.Sprite):
-    def __init__(self, x, y):
-        super().__init__()
-        self.image = pygame.transform.scale(pygame.image.load("powerup_upg.png"), (base_size/4, base_size/4))
-        self.rect = self.image.get_rect()
-        self.rect.x = x + base_size/2 - self.image.get_width()/2
-        self.rect.y = y - self.image.get_height()
+    def __init__(self, x, y, angle):
+        pygame.sprite.Sprite.__init__(self)
+        self.speed = 5
+        self.angle = angle +180
+        self.image = pygame.transform.rotate(pygame.transform.scale(pygame.image.load("powerup_upg.png"), (base_size/4, base_size/4)), self.angle)
+        self.x = x 
+        self.y = y 
+        self.hori = math.sin(math.radians(self.angle)) * self.speed
+        self.vert = math.cos(math.radians(self.angle)) * self.speed
+        self.rect = self.image.get_rect(center = (self.x, self.y))
     def move(self):
-        self.rect.y -= 5
+        self.x += self.hori
+        self.y += self.vert
+        self.rect = self.image.get_rect(center = (self.x, self.y))
                                         # all of the enemy classes will be completed later, this is just a basic structure
 # class for enemies(enemy boats)
 class Enemy(pygame.sprite.Sprite):
@@ -454,6 +479,9 @@ powerupImg_upgrade = pygame.transform.scale(pygame.image.load("powerup_upg.png")
 powerupsImgs = [powerupImg_speed, powerupImg_health, powerupImg_shield, powerupImg_points, powerupImg_upgrade]
 powerup_sprites = pygame.sprite.Group()
 
+# day night cycle settup
+day_night_cycle = "day" # will be used later for changing the colors of the enemies and background
+
 # setting up a new thread for handling the spawning of obstacles and enemies and powerups
 spawn_thread = threading.Thread(target=spawn_thread)
 
@@ -471,7 +499,7 @@ game_over = False
 powerups_not_allowed = False
 game_mode = "Endless"
 game_played = False
-day_night_cycle = "day" # will be used later for changing the colors of the entire game (white and black for night)
+angle = 0
 while running:
 
     # entering menu
@@ -532,22 +560,22 @@ while running:
             running = False
         if event.type == pygame.KEYDOWN:
             if event.key == pygame.K_LEFT or event.key == pygame.K_a:
-                player.x_change = -player.speed
+                angle = 5
             if event.key == pygame.K_RIGHT or event.key == pygame.K_d:
-                player.x_change = player.speed
+                angle = -5
             if event.key == pygame.K_UP or event.key == pygame.K_w:
-                player.y_change = -player.speed
+                player.direction = "up"
             if event.key == pygame.K_DOWN or event.key == pygame.K_s:
-                player.y_change = player.speed
+                player.direction = "down"
             if event.key == pygame.K_SPACE and player.firing_rate != 0 and player.can_fire == True:
                 player.shoot()
             if event.key == pygame.K_r:
                 restart_game()
         if event.type == pygame.KEYUP:
-            if event.key == pygame.K_LEFT or event.key == pygame.K_RIGHT or event.key == pygame.K_a or event.key == pygame.K_d:
-                player.x_change = 0
             if event.key == pygame.K_UP or event.key == pygame.K_DOWN or event.key == pygame.K_w or event.key == pygame.K_s:
-                player.y_change = 0
+                player.direction = ""
+            if event.key == pygame.K_LEFT or event.key == pygame.K_RIGHT or event.key == pygame.K_a or event.key == pygame.K_d:
+                angle = 0
         if event.type == pygame.MOUSEBUTTONDOWN:
             if event.button == 1:
                 # checking if the settings button is clicked
@@ -561,17 +589,18 @@ while running:
                     spawnning = False
 
     # moving player
+    player.angle += angle
     player.move()
 
     # checking boundaries for player
-    if player.rect.x < 0:
-        player.rect.x = 0
-    elif player.rect.x > width - playerImg.get_width():
-        player.rect.x = width - playerImg.get_width() 
-    if player.rect.y < 0:
-        player.rect.y = 0
-    elif player.rect.y > height - playerImg.get_height():
-        player.rect.y = height - playerImg.get_height()
+    if player.x < 0:
+        player.x = 0
+    elif player.x > width - playerImg.get_width():
+        player.x = width - playerImg.get_width() 
+    if player.y < 0:
+        player.y = 0
+    elif player.y > height - playerImg.get_height():
+        player.y = height - playerImg.get_height()
     
     # drawing and moving obstacles
     obstacle_sprites.draw(screen)
@@ -590,6 +619,7 @@ while running:
 
     # drawing player
     player.draw()
+    #print(player.rect.x, player.rect.y)
 
     # drawing settings button
     screen.blit(setting_img, (width - setting_img.get_width(), 0))
