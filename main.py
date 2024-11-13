@@ -115,7 +115,7 @@ def game_over_screen():
         screen.fill((255, 255, 255))
         text = font.render("Game Over", True, (0, 0, 0))
         screen.blit(text, (width/2-text.get_width()/2, height/2-text.get_height()))
-        text = font.render("Number of points "+str(player.points), True, (0, 0, 0))
+        text = font.render("Number of points: "+str(player.points), True, (0, 0, 0))
         screen.blit(text, (width/2-text.get_width()/2, height/2+text.get_height()*0.5))
         text = font.render("Press R to restart", True, (0, 0, 0))
         screen.blit(text, (width/2-text.get_width()/2, height/2+text.get_height()*2))
@@ -328,7 +328,7 @@ class Player(pygame.sprite.Sprite):
         if sounds_allowed:
             ship_fire.play()
         self.can_fire = False
-        bullet = Bullet(self.x+self.img.get_width()/2, self.y + self.img.get_width()/2, self.angle)
+        bullet = Bullet(self.x ,self.y, self.angle)
         canonballs.add(bullet)
 
     def move(self):
@@ -348,8 +348,8 @@ class Player(pygame.sprite.Sprite):
         self.rect = self.img.get_rect(center = (self.x, self.y))
     
     def upgrade(self):
-        self.image = pygame.transform.scale(pygame.image.load('boat'+str(player.upgrade_level)+'.png'), (base_size, base_size))
-        self.rect = self.image.get_rect(center = (self.x, self.y))
+        self.img = pygame.transform.scale(pygame.image.load('boat'+str(player.upgrade_level)+'.png'), (base_size, base_size))
+        self.rect = self.img.get_rect(center = (self.x, self.y))
         # will be enhanced later on
         if self.upgrade_level == 1:
             self.firing_rate = 1
@@ -359,8 +359,7 @@ class Player(pygame.sprite.Sprite):
             self.firing_rate = 3
 
     def draw(self):
-        self.img = pygame.transform.rotate(playerImg, self.angle)
-        screen.blit(self.img, (self.x, self.y))
+        screen.blit(pygame.transform.rotate(self.img, self.angle), (self.rect))
         self.rect = self.img.get_rect(center = (self.x, self.y))
 
 # class for obstacles
@@ -416,45 +415,69 @@ class Bullet(pygame.sprite.Sprite):
 # class for enemies(enemy boats)
 class Enemy(pygame.sprite.Sprite):
     def __init__(self):
-        global frame_rate
+        global frame_rate, width, height
         pygame.sprite.Sprite.__init__(self)
         # the enemy will use the same boat as the player, however the enemy will boats will have a pirate flag on them, this will be added later on
         if player.upgrade_level == 1:
             self.image = pygame.transform.scale(pygame.image.load("boat.png"), (base_size, base_size))
         else:
             self.image = pygame.transform.scale(pygame.image.load("boat{player.update_level}.png"), (base_size, base_size))
-        self.rect = self.image.get_rect()
-        self.rect.x = random.randint(0, width - self.image.get_width())
-        self.rect.y = 0 - self.image.get_height()
-        self.angle = player.angle + 180 # later will be changed, this is just for testing purposes
+        self.x = random.randint(0, width - self.image.get_width())
+        self.y = 0 - self.image.get_height()
+        self.rect = self.image.get_rect(center = (self.x, self.y))
+        self.destin_x = random.randint(self.image.get_width(), width - self.image.get_width())
+        self.destin_y = random.randint(self.image.get_height(), height - self.image.get_height())
+        self.angle = player.angle #math.degrees(math.atan2(self.destin_x - self.x, self.destin_y - self.y)) # later will be changed, this is just for testing purposes
         self.image = pygame.transform.rotate(self.image, self.angle)
+        self.turret_image = pygame.transform.scale(pygame.image.load("powerup_upg.png"), (base_size/4, base_size/4)) # will have its own image later
         self.fire_rate = player.firing_rate * frame_rate # this is because the shoot function is called from the main loop 
         self.can_fire = True
         self.health = player.health # enemies will have the same health as the player, this could work as a balancing factor
-
+        self.speed = player.speed
+ 
     def move(self):
-        # moving the enemy for now just arround the player
-        if self.rect.x < player.rect.x:
-            self.rect.x += 1
-        elif self.rect.x > player.rect.x:
-            self.rect.x -= 1
-        if self.rect.y < player.rect.y:
-            self.rect.y += 1
-        elif self.rect.y > player.rect.y:
-            self.rect.y -= 1
+        global width, height
+        # moving the enemy, the  enemy will now do random circle like movements around the player, maybe I will change this later
+        #print(self.rect.x, self.rect.y, self.destin_x, self.destin_y)
+        if abs(self.x - self.destin_x) < self.speed:
+            pass
+        elif self.x < self.destin_x:
+            self.x += self.speed
+        elif self.x > self.destin_x:
+            self.x -= self.speed
+        if abs(self.y - self.destin_y) < self.speed:
+            pass
+        elif self.y < self.destin_y:
+            self.y += self.speed
+        elif self.y > self.destin_y:
+            self.y -= self.speed
+        # if the enemy is close enough to the destination point, a new destination point will be set
+        if abs(self.x - self.destin_x) < self.speed and abs(self.y - self.destin_y) < self.speed:
+            self.destin_x = random.randint(self.image.get_width(), width - self.image.get_width())
+            self.destin_y = random.randint(self.image.get_height(), height - self.image.get_height())
+            # adjusting the angle of the enemy to the destination point
+        self.angle = player.angle
+
+        self.rect = self.image.get_rect( center = (self.x, self.y))
+    
+    def draw(self):
+        # I didnt know I cant just modify the self.image with the new rotated image, because it will deteriorate until it crashes the game
+        # so instead I will not use the sprite draw function, but my own that will rotate the image every time its drawn
+        screen.blit(pygame.transform.rotate(self.image, self.angle), (self.rect))
+        screen.blit(pygame.transform.rotate(self.turret_image, self.angle), (self.x, self.y))
     
     def update(self):
         # displaying the health of the enemy below the enemy
         global enemy_font
         text = enemy_font.render(str(self.health), True, (255, 0, 0))
-        screen.blit(text, (self.rect.x+base_size/2 - text.get_width()/2, self.rect.y + self.image.get_height()))
+        screen.blit(text, (self.x- text.get_width()/2, self.y + self.image.get_height()/2))
 
     def shoot(self):
         global enemy_canonballs, frame_rate, sounds_allowed
         if self.can_fire == True:
             if sounds_allowed:
                 ship_fire.play() # maybe later the enemies will have a distinct sound for firing
-            bullet = EnemyBullet(self.rect.x+self.image.get_width()/2, self.rect.y + self.image.get_width()/2, self.angle)
+            bullet = EnemyBullet(self.x, self.y, self.angle)
             enemy_canonballs.add(bullet)
             self.can_fire = False
         else:
@@ -699,8 +722,8 @@ while running:
     player.draw()
 
     # drawing and moving enemies
-    enemies.draw(screen)
     for enemy in enemies:
+        enemy.draw()
         enemy.move()
         enemy.update() # displaying the health of the enemy
         enemy.shoot()
