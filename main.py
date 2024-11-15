@@ -45,6 +45,10 @@ def spawn_thread():
 
 # function for restarting the game
 def restart_game():
+    # getting the new screen size and adjusting the base size
+    global width, height, base_size, screen_speed
+    width, height = screen.get_size()
+    base_size = width/12
     global player, obstacle_sprites, powerup_sprites, enemy_canonballs, canonballs, enemies, angle, music_allowed
     obstacle_sprites = pygame.sprite.Group()
     powerup_sprites = pygame.sprite.Group()
@@ -872,7 +876,7 @@ while running:
             if bullet.rect.colliderect(powerup.rect):
                 enemy_canonballs.remove(bullet)
                 powerup_sprites.remove(powerup)
-
+    settings = False
     clock.tick(frame_rate)
     pygame.display.update()
 
