@@ -11,8 +11,8 @@ D, RIGHT_arrow turn right(angle) <br>
 SPACE = shoot <br>
 R = restart game <br>
 ## Screenshots of the game 
-<br>
-<br>
+![image](https://github.com/user-attachments/assets/f021a218-de85-4bbc-ae7b-6f75079f1bfc)<br>
+![image](https://github.com/user-attachments/assets/e792cd22-7856-4b27-91ae-db8830912b92)<br>
 ## Why this ?
 The reasons are pretty simple. I had last programmed in Python a few months ago, so I needed some simple project to relearn it, and the HackClub event this project is tied to has a pirat theme, so it was clear what I will do. <br>
 
