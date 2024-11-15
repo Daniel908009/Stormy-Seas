@@ -3,6 +3,7 @@
 This game is a classic 2d obstacle game. The game is written in Python Pygame library, so dont expect miracles. <br>
 The gameplay is very simple, there is obstacles like rooks and icebergs coming from the top of the screen, and player has to avoid them. <br>
 Features: Game has many basic features such as a settings menu, main menu, etc. It also has basic enemies, it is also resizable and should work in any window size. <br>
+*Note to apply changes in the window size, you have to reset the game, by pressing the key r <br>
 ## Controls
 W,UP_arrow = forwards movement <br>
 S,DOWN_arrow = backwards movement <br>
