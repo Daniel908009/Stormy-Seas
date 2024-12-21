@@ -47,7 +47,4 @@ Now open a console and enter the folowing code: pip install -r /path/to/requirem
 Enjoy the game! <br>
 <h2>Using Pypi</h2>
 simply open your command prompt and enter this command: pip install Stormy-Seas-package <br>
-and the run it using this command: pygame(your version) -m Stormy_Seas_package.main <br>
-versions of python can look like this: python3.10 python3 or similar <br>
-to find your version enter this command: python --version <br>
-If any of this is confusing or I made some errors in my explenation then check this guide: https://packaging.python.org/en/latest/tutorials/installing-packages/<br>
+and the run it using this command: Stormy_Seas_package <br>
